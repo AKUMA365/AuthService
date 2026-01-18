@@ -1,0 +1,4 @@
+.env
+storage
+go.mod
+go.sum
