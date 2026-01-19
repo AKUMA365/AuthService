@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"AuthServis/internal/config"
+	"AuthServis/internal/http-server/handlers/register"
 	"AuthServis/internal/lib/logger/sl"
 	"AuthServis/internal/storage/postgres"
 )
@@ -26,16 +27,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	_ = storage
-
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	router.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("register handler"))
-	})
+	router.Post("/register", register.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -55,5 +52,16 @@ func main() {
 }
 
 func setupLogger(env string) *slog.Logger {
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	var log *slog.Logger
+
+	switch env {
+	case "local":
+		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case "dev":
+		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case "prod":
+		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	}
+
+	return log
 }
