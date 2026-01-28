@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  auth-app:
+    build: .
+    container_name: auth-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-db
+    environment:
+      - CONFIG_PATH=./config/local.yaml
+      - DATABASE_URL=postgres://postgres:7898@localhost:5432/PulseUserDB?sslmode=disable
+      - HTTP_SERVER_ADDRESS=0.0.0.0:8080
+    restart: always
+
+  auth-db:
+    image: postgres:15-alpine
+    container_name: auth-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: PulseUserDB
+    ports:
+      - "5436:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/1_init.up.sql:/docker-entrypoint-initdb.d/1_init.up.sql
+
+volumes:
+  pgdata:

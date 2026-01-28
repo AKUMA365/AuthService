@@ -3,11 +3,20 @@ package login
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
+	"golang.org/x/crypto/bcrypt"
+
+	"AuthServis/internal/domain/models"
+	"AuthServis/internal/lib/api/response"
+	"AuthServis/internal/lib/jwt"
+	"AuthServis/internal/storage"
 )
 
 type Request struct {
@@ -15,11 +24,16 @@ type Request struct {
 	Password string `json:"password" validate:"required"`
 }
 
-type UserProvider interface {
-	User(ctx context.Context, email string) (int64, error)
+type Response struct {
+	response.Response
+	Token string `json:"token,omitempty"`
 }
 
-func New(log *slog.Logger, userProvider UserProvider) http.HandlerFunc {
+type UserProvider interface {
+	User(ctx context.Context, email string) (models.User, error)
+}
+
+func New(log *slog.Logger, userProvider UserProvider, tokenTTL time.Duration, appSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.login.New"
 
@@ -29,39 +43,53 @@ func New(log *slog.Logger, userProvider UserProvider) http.HandlerFunc {
 		)
 
 		var req Request
-
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			log.Error("failed to decode request body", slog.Any("error", err))
-
-			responseError(w, "failed to decode request", http.StatusBadRequest)
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, response.Error("failed to decode request"))
 			return
 		}
-
-		log.Info("request body decoded", slog.String("email", req.Email))
 
 		if err := validator.New().Struct(req); err != nil {
 			validateErr := err.(validator.ValidationErrors)
 			log.Error("invalid request", slog.Any("error", validateErr))
-
-			responseError(w, "invalid request fields", http.StatusBadRequest)
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, response.Error("invalid request"))
 			return
 		}
 
+		user, err := userProvider.User(r.Context(), req.Email)
+		if err != nil {
+			if errors.Is(err, storage.ErrUserNotFound) {
+				log.Warn("user not found", slog.String("email", req.Email))
+				render.Status(r, http.StatusBadRequest)
+				render.JSON(w, r, response.Error("invalid email or password"))
+				return
+			}
+			log.Error("failed to get user", slog.Any("error", err))
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, response.Error("internal error"))
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword(user.PassHash, []byte(req.Password)); err != nil {
+			log.Info("invalid password", slog.String("email", req.Email))
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, response.Error("invalid email or password"))
+			return
+		}
+
+		token, err := jwt.New(user, appSecret, tokenTTL)
+		if err != nil {
+			log.Error("failed to generate token", slog.Any("error", err))
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, response.Error("internal error"))
+			return
+		}
+
+		render.JSON(w, r, Response{
+			Response: response.OK(),
+			Token:    token,
+		})
 	}
-}
-
-func responseError(w http.ResponseWriter, msg string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"status": "error", "msg": msg})
-}
-
-func responseOK(w http.ResponseWriter, uid int64) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "OK",
-		"uid":    uid,
-	})
 }
