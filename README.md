@@ -1,78 +1,111 @@
 AuthService
 
-AuthService is a microservice for user authentication and registration written in Go. The project utilizes REST API, a PostgreSQL database, and structured logging.
+AuthService is a high-performance microservice for user registration and authentication, written in Go (Golang). It follows Clean Architecture principles and utilizes a REST API, PostgreSQL database, JWT authentication, and Docker containerization.
+🚀 Features
+
+    User Registration: Secure creation of users with password hashing (bcrypt).
+
+    Authentication: Login mechanism returning JWT (JSON Web Tokens).
+
+    Protected Routes: Middleware to protect endpoints using Bearer tokens.
+
+    Clean Architecture: Separation of concerns (Handlers -> Services -> Storage).
+
+    Structured Logging: Uses Go's log/slog for JSON and text logging.
+
+    Configuration: Flexible config via YAML and Environment Variables.
+
+    Dockerized: Ready-to-deploy with Docker and Docker Compose.
+
+    Migrations: Automatic database initialization.
+
 🛠 Tech Stack
 
-    Language: Go (Golang) 1.22+
+    Language: Go 1.22+
 
-    Router:
+    Router: chi
 
     Database: PostgreSQL
 
-    DB Driver:
+    Driver:
 
-    Configuration: (YAML + ENV)
-
-    Logging: log/slog (Structured Logging)
+    Config:
 
     JWT:
 
-    Validation:
-
-    Testing: testing, testify
+    Validation: 
 
 📂 Project Structure
+⚙️ Configuration
 
-The project follows the standard Go project layout:
-🚀 Installation & Run
-1. Prerequisites
+The application is configured using config/local.yaml. Values can be overridden by environment variables (useful for Docker).
+🚀 Getting Started
+Option 1: Run with Docker (Recommended)
 
-    Go installed (version 1.21 or higher)
+This is the easiest way to run the service and the database together.
 
-    PostgreSQL (running locally or in Docker)
+    Clone the repository.
 
-2. Database Setup
+    Run Docker Compose:
 
-Create a database and the users table. Example SQL:
-3. Configuration Setup
+    The service will start on port 8080. The database will be initialized automatically using the migration files.
 
-Ensure the config/local.yaml file is configured correctly:
-4. Running the Application
+Option 2: Run Locally
 
-Note: If you have updated main.go to accept flags, the command might look like: go run cmd/authservic/main.go --config=./config/local.yaml
-🔌 API Endpoints
-Register User
+Prerequisites:
 
-URL: /register (or /auth/register depending on router setup) Method: POST
+    Go 1.22+ installed.
 
-Request Body (JSON):
+    PostgreSQL running locally.
 
-    email: Required, must be a valid email address.
+    Create the database: Create a database named PulseUserDB (or update config/local.yaml to match your DB).
 
-    password: Required, minimum 8 characters.
+    Apply Migrations: Run the SQL commands found in migrations/1_init.up.sql in your database manager.
 
-Success Response (200 OK):
+    Install Dependencies:
 
-Error Responses:
+    Run the App:
 
-    400 Bad Request: Invalid data format or validation failed.
+📡 API Endpoints
+1. Register User
 
-    409 Conflict: User with this email already exists.
+Create a new user account.
 
-    500 Internal Server Error: Server-side error.
+    URL: /register
 
-Login (Authorization)
+    Method: POST
 
-(Logic is implemented, waiting to be connected to router)
+    Body:
 
-URL: /login Method: POST
+    Response (200 OK):
 
-Request Body (JSON):
+2. Login
 
-Success Response (200 OK):
+Authenticate and receive a JWT access token.
+
+    URL: /login
+
+    Method: POST
+
+    Body:
+
+    Response (200 OK):
+
+3. Get User Info (Protected)
+
+An example of a protected route requiring a token.
+
+    URL: /me
+
+    Method: GET
+
+    Headers:
+
+    Response (200 OK):
+
 🧪 Testing
 
-The project includes unit tests for handlers. To run them:
-📝 License
+To run the unit tests (e.g., for the Register handler):
+📄 License
 
-This project is distributed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the file for details.
