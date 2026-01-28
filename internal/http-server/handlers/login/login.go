@@ -1,31 +1,27 @@
-package register
+package login
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator/v10"
-	"golang.org/x/crypto/bcrypt"
-
-	"AuthServis/internal/storage"
 )
 
 type Request struct {
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
+	Password string `json:"password" validate:"required"`
 }
 
-type UserSaver interface {
-	SaveUser(ctx context.Context, email string, passHash []byte) (int64, error)
+type UserProvider interface {
+	User(ctx context.Context, email string) (int64, error)
 }
 
-func New(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
+func New(log *slog.Logger, userProvider UserProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.register.New"
+		const op = "handlers.login.New"
 
 		log = log.With(
 			slog.String("op", op),
@@ -52,31 +48,6 @@ func New(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 			return
 		}
 
-		passHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-		if err != nil {
-			log.Error("failed to generate password hash", slog.Any("error", err))
-
-			responseError(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		uid, err := userSaver.SaveUser(r.Context(), req.Email, passHash)
-
-		if err != nil {
-			if errors.Is(err, storage.ErrUserExists) {
-				log.Warn("user already exists", slog.String("email", req.Email))
-				responseError(w, "user already exists", http.StatusConflict)
-				return
-			}
-
-			log.Error("failed to save user", slog.Any("error", err))
-			responseError(w, "failed to save user", http.StatusInternalServerError)
-			return
-		}
-
-		log.Info("user saved", slog.Int64("uid", uid))
-
-		responseOK(w, uid)
 	}
 }
 
